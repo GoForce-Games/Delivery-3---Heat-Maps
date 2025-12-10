@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 75755fa8ab5f87145bdb4ad43e0e69e1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135162
+  packageName: 3D Game Kit Lite
+  packageVersion: 1.8.2
+  assetPath: Assets/3DGamekitLite/Scenes/PostProcessingProfile.asset
+  uploadId: 462213
