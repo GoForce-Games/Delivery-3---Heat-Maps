@@ -23,6 +23,9 @@ public enum EntityType
 
 public class AnalyticsManager : MonoBehaviour
 {
+    // Singleton Instance
+    public static AnalyticsManager Instance { get; private set; }
+
     [Header("Position Tracking")]
     public bool isPositionTracking = true;
     public Transform positionTracker;
@@ -94,6 +97,14 @@ public class AnalyticsManager : MonoBehaviour
     
     void Awake()
     {
+        // Singleton setup
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        
         sessionStartTime = Time.time;
     }
     
