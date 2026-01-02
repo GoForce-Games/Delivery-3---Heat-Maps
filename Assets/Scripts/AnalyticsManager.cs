@@ -12,6 +12,15 @@ public enum EntityType
     Other
 }
 
+[System.Serializable]
+    public class GameplayEvent {
+    public string sessionID;
+    public string eventType; 
+    public Vector3 position;
+    public string timestamp;
+    public float sessionDuration;
+}
+
 public class AnalyticsManager : MonoBehaviour
 {
     [Header("Position Tracking")]
@@ -73,5 +82,69 @@ public class AnalyticsManager : MonoBehaviour
         StartCoroutine(Upload(data, "PlayerDeath"));
     }
 
+    
+
+    #endregion
+
+    #region Event Recording
+    
+    private List<GameplayEvent> localEventsList = new List<GameplayEvent>();
+    private string currentSessionID = System.Guid.NewGuid().ToString();
+    private float sessionStartTime;
+    
+    void Awake()
+    {
+        sessionStartTime = Time.time;
+    }
+    
+    public void RecordEvent(string type, Vector3 position, bool uploadToServer = false)
+    {
+        GameplayEvent newEvent = new GameplayEvent
+        {
+            sessionID = currentSessionID,
+            eventType = type,
+            position = position,
+            timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+            sessionDuration = Time.time - sessionStartTime
+        };
+
+        localEventsList.Add(newEvent);
+        Debug.Log($"[Analytics] Evento registrado: {type} en {position}. Total eventos: {localEventsList.Count}");
+
+        if (uploadToServer)
+        {
+            UploadEvent(newEvent);
+        }
+    }
+    
+    private void UploadEvent(GameplayEvent gameEvent)
+    {
+        Dictionary<string, string> data = new Dictionary<string, string>
+        {
+            ["sessionID"] = gameEvent.sessionID,
+            ["eventType"] = gameEvent.eventType,
+            ["positionX"] = gameEvent.position.x.ToString(),
+            ["positionY"] = gameEvent.position.y.ToString(),
+            ["positionZ"] = gameEvent.position.z.ToString(),
+            ["timestamp"] = gameEvent.timestamp,
+            ["sessionDuration"] = gameEvent.sessionDuration.ToString()
+        };
+
+        StartCoroutine(Upload(data, "GameplayEvent.php"));
+    }
+    
+    public List<GameplayEvent> GetAllEvents()
+    {
+        return new List<GameplayEvent>(localEventsList);
+    }
+    
+    public void UploadAllEvents()
+    {
+        foreach (var gameEvent in localEventsList)
+        {
+            UploadEvent(gameEvent);
+        }
+    }
+    
     #endregion
 }
