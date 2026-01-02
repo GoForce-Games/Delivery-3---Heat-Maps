@@ -289,6 +289,9 @@ namespace Gamekit3D
                     m_VerticalSpeed = jumpSpeed;
                     m_IsGrounded = false;
                     m_ReadyToJump = false;
+                    
+                    //Salto para analytics
+                    AnalyticsManager.Instance.RecordEvent("Salto", transform.position);
                 }
             }
             else

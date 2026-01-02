@@ -96,8 +96,29 @@ namespace Gamekit3D
             isInvulnerable = true;
             currentHitPoints -= data.amount;
 
+            // Analytics: Record hit event when Ellen (Player) hits an enemy
+            if (data.damager != null && data.damager.name == "intable")
+            {
+                if (gameObject.CompareTag("Enemy") || gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter"))
+                {
+                    AnalyticsManager.Instance.RecordEvent("Golpe", transform.position);
+                }
+            }
+
             if (currentHitPoints <= 0)
-                schedule += OnDeath.Invoke; //This avoid race condition when objects kill each other.
+            {
+                schedule += OnDeath.Invoke; 
+
+                // Analytics: Record death events
+                if (gameObject.CompareTag("Player") || gameObject.name == "Ellen")
+                {
+                    AnalyticsManager.Instance.RecordEvent("Muerte", transform.position);
+                }
+                else if (gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter"))
+                {
+                    AnalyticsManager.Instance.RecordEvent("MuerteEnemigo", transform.position);
+                }
+            }
             else
                 OnReceiveDamage.Invoke();
 
