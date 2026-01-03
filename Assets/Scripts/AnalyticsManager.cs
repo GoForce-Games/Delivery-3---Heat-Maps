@@ -19,6 +19,7 @@ public enum EntityType
     public Vector3 position;
     public string timestamp;
     public float sessionDuration;
+    [System.NonSerialized] public bool isSentToServer;
 }
 
 public class AnalyticsManager : MonoBehaviour
@@ -153,7 +154,11 @@ public class AnalyticsManager : MonoBehaviour
     {
         foreach (var gameEvent in localEventsList)
         {
-            UploadEvent(gameEvent);
+            if (!gameEvent.isSentToServer)
+            {
+                UploadEvent(gameEvent);
+                gameEvent.isSentToServer = true;
+            }
         }
     }
     
