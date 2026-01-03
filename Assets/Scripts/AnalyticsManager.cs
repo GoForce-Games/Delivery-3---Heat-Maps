@@ -36,13 +36,60 @@ public class AnalyticsManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        // Auto-find player if positionTracker not set
+        if (positionTracker == null)
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                positionTracker = player.transform;
+                Debug.Log("[Analytics] Player encontrado automáticamente: " + player.name);
+            }
+            else
+            {
+                Debug.LogWarning("[Analytics] No se encontró el Player. Asigna manualmente positionTracker.");
+            }
+        }
         
+        // Start position tracking coroutine
+        if (isPositionTracking && positionTracker != null)
+        {
+            StartCoroutine(PositionTrackingCoroutine());
+        }
     }
 
     // Update is called once per frame
     void Update()
     {
         
+    }
+    
+    IEnumerator PositionTrackingCoroutine()
+    {
+        Debug.Log("[Analytics] Iniciando tracking de posición cada " + sampleRateSeconds + " segundos.");
+        
+        while (true)
+        {
+            yield return new WaitForSeconds(sampleRateSeconds);
+            
+            if (positionTracker != null)
+            {
+                RecordEvent("Posicion", positionTracker.position);
+            }
+        }
+    }
+    
+    public void RecordEvent(string type)
+    {
+        if (positionTracker != null)
+        {
+            RecordEvent(type, positionTracker.position);
+        }
+        else
+        {
+            RecordEvent(type, Vector3.zero);
+            Debug.LogWarning("[Analytics] RecordEvent llamado sin positionTracker configurado.");
+        }
     }
     
     IEnumerator Upload(Dictionary<string, string> data, string endpoint, Action<uint> callback = null)
