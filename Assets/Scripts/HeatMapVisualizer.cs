@@ -275,6 +275,11 @@ public class HeatmapEditorWindow : EditorWindow
             {
                 CreateVisualizer();
             }
+
+            if (GUILayout.Button("Encontrar HeatMapVisualizer en Escena"))
+            {
+                visualizer = FindFirstObjectByType<HeatMapVisualizer>();
+            }
             
             EditorGUILayout.EndScrollView();
             return;
