@@ -38,7 +38,7 @@ public class HeatMapVisualizer : MonoBehaviour
     
     public void LoadDataFromManager()
     {
-        if (AnalyticsManager.Instance != null)
+        if (AnalyticsManager.Instance)
         {
             loadedEvents = AnalyticsManager.Instance.GetAllEvents();
             Debug.Log($"[HeatMapVisualizer] Cargados {loadedEvents.Count} eventos desde AnalyticsManager.");
@@ -111,7 +111,7 @@ public class HeatMapVisualizer : MonoBehaviour
     
     private List<GameplayEvent> GetFilteredEvents()
     {
-        return loadedEvents.Where(e => ShouldShowEvent(e)).ToList();
+        return loadedEvents.Where(ShouldShowEvent).ToList();
     }
     
     private bool ShouldShowEvent(GameplayEvent gameEvent)
@@ -261,19 +261,24 @@ public class HeatmapEditorWindow : EditorWindow
     {
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         
-        EditorGUILayout.LabelField("🔥 Heatmap Visualizer", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Heatmap Visualizer", EditorStyles.boldLabel);
         EditorGUILayout.Space(10);
         
         
         DrawVisualizerSection();
         
-        if (visualizer == null)
+        if (!visualizer)
         {
             EditorGUILayout.HelpBox("Selecciona un HeatMapVisualizer en la escena o crea uno nuevo.", MessageType.Info);
             
             if (GUILayout.Button("Crear HeatMapVisualizer en Escena"))
             {
                 CreateVisualizer();
+            }
+
+            if (GUILayout.Button("Encontrar HeatMapVisualizer en Escena"))
+            {
+                visualizer = FindFirstObjectByType<HeatMapVisualizer>();
             }
             
             EditorGUILayout.EndScrollView();
@@ -315,15 +320,11 @@ public class HeatmapEditorWindow : EditorWindow
         );
         
         
-        if (visualizer == null)
-        {
-            visualizer = FindFirstObjectByType<HeatMapVisualizer>();
-        }
     }
     
     private void DrawDataLoadingSection()
     {
-        EditorGUILayout.LabelField("📂 Carga de Datos", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Carga de Datos", EditorStyles.boldLabel);
         
         EditorGUILayout.BeginHorizontal();
         
@@ -376,19 +377,19 @@ public class HeatmapEditorWindow : EditorWindow
     
     private void DrawFiltersSection()
     {
-        EditorGUILayout.LabelField("🔍 Filtros de Eventos", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Filtros de Eventos", EditorStyles.boldLabel);
         
         EditorGUI.BeginChangeCheck();
         
         EditorGUILayout.BeginHorizontal();
-        visualizer.showDeaths = EditorGUILayout.ToggleLeft("💀 Muertes", visualizer.showDeaths, GUILayout.Width(100));
-        visualizer.showJumps = EditorGUILayout.ToggleLeft("🦘 Saltos", visualizer.showJumps, GUILayout.Width(100));
-        visualizer.showPositions = EditorGUILayout.ToggleLeft("📍 Posiciones", visualizer.showPositions, GUILayout.Width(100));
+        visualizer.showDeaths = EditorGUILayout.ToggleLeft("Muertes", visualizer.showDeaths, GUILayout.Width(100));
+        visualizer.showJumps = EditorGUILayout.ToggleLeft("Saltos", visualizer.showJumps, GUILayout.Width(100));
+        visualizer.showPositions = EditorGUILayout.ToggleLeft("Posiciones", visualizer.showPositions, GUILayout.Width(100));
         EditorGUILayout.EndHorizontal();
         
         EditorGUILayout.BeginHorizontal();
-        visualizer.showHits = EditorGUILayout.ToggleLeft("⚔️ Golpes", visualizer.showHits, GUILayout.Width(100));
-        visualizer.showEnemyKills = EditorGUILayout.ToggleLeft("👹 Enemigos", visualizer.showEnemyKills, GUILayout.Width(100));
+        visualizer.showHits = EditorGUILayout.ToggleLeft("Golpes", visualizer.showHits, GUILayout.Width(100));
+        visualizer.showEnemyKills = EditorGUILayout.ToggleLeft("Enemigos", visualizer.showEnemyKills, GUILayout.Width(100));
         EditorGUILayout.EndHorizontal();
         
         if (EditorGUI.EndChangeCheck())
@@ -454,7 +455,7 @@ public class HeatmapEditorWindow : EditorWindow
     
     private void DrawVisualizationSection()
     {
-        EditorGUILayout.LabelField("🎨 Configuración Visual", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Configuración Visual", EditorStyles.boldLabel);
         
         EditorGUI.BeginChangeCheck();
         
@@ -484,7 +485,7 @@ public class HeatmapEditorWindow : EditorWindow
     
     private void DrawStatisticsSection()
     {
-        EditorGUILayout.LabelField("📊 Estadísticas", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Estadísticas", EditorStyles.boldLabel);
         
         string stats = visualizer.GetStatistics();
         EditorGUILayout.HelpBox(stats, MessageType.None);

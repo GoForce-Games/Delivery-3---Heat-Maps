@@ -19,7 +19,7 @@ public enum EntityType
     public Vector3 position;
     public string timestamp;
     public float sessionDuration;
-    [System.NonSerialized] public bool isSentToServer;
+    public bool isSentToServer;
 }
 
 public class AnalyticsManager : MonoBehaviour
