@@ -360,6 +360,18 @@ public class HeatmapEditorWindow : EditorWindow
         {
             LoadFromJson(jsonPath);
         }
+        
+        EditorGUILayout.Space(5);
+        
+        if (GUILayout.Button("Exportar a JSON", GUILayout.Height(25)))
+        {
+            string path = EditorUtility.SaveFilePanel("Exportar eventos a JSON", Application.dataPath, "analytics_events", "json");
+            if (!string.IsNullOrEmpty(path) && AnalyticsManager.Instance != null)
+            {
+                AnalyticsManager.Instance.ExportToJson(path);
+                EditorUtility.DisplayDialog("Exportar JSON", $"Eventos exportados correctamente a:\n{path}", "OK");
+            }
+        }
     }
     
     private void DrawFiltersSection()
@@ -503,17 +515,16 @@ public class HeatmapEditorWindow : EditorWindow
     
     private void LoadFromJson(string path)
     {
-        try
+        if (AnalyticsManager.Instance != null)
         {
-            string json = System.IO.File.ReadAllText(path);
-            
-            
-            Debug.Log($"[HeatmapEditorWindow] Cargando desde: {path}");
-            EditorUtility.DisplayDialog("Cargar JSON", "Función de carga desde JSON pendiente de implementar según formato del servidor.", "OK");
+            List<GameplayEvent> events = AnalyticsManager.Instance.ImportFromJson(path);
+            visualizer.LoadEvents(events);
+            SceneView.RepaintAll();
+            EditorUtility.DisplayDialog("Cargar JSON", $"Cargados {events.Count} eventos desde JSON.", "OK");
         }
-        catch (System.Exception e)
+        else
         {
-            Debug.LogError($"[HeatmapEditorWindow] Error al cargar JSON: {e.Message}");
+            Debug.LogError("[HeatmapEditorWindow] AnalyticsManager no encontrado. Asegúrate de que existe en la escena.");
         }
     }
     

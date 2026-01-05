@@ -210,4 +210,78 @@ public class AnalyticsManager : MonoBehaviour
     }
     
     #endregion
+    
+    #region JSON Export/Import
+    
+    [System.Serializable]
+    private class SerializableEvent
+    {
+        public string sessionID;
+        public string eventType;
+        public float posX, posY, posZ;
+        public string timestamp;
+        public float sessionDuration;
+    }
+    
+    [System.Serializable]
+    private class EventsWrapper
+    {
+        public List<SerializableEvent> events = new List<SerializableEvent>();
+    }
+    
+    public void ExportToJson(string path)
+    {
+        EventsWrapper wrapper = new EventsWrapper();
+        
+        foreach (var e in localEventsList)
+        {
+            wrapper.events.Add(new SerializableEvent
+            {
+                sessionID = e.sessionID,
+                eventType = e.eventType,
+                posX = e.position.x,
+                posY = e.position.y,
+                posZ = e.position.z,
+                timestamp = e.timestamp,
+                sessionDuration = e.sessionDuration
+            });
+        }
+        
+        string json = JsonUtility.ToJson(wrapper, true);
+        System.IO.File.WriteAllText(path, json);
+        Debug.Log($"[Analytics] Exportados {localEventsList.Count} eventos a: {path}");
+    }
+    
+    public List<GameplayEvent> ImportFromJson(string path)
+    {
+        List<GameplayEvent> importedEvents = new List<GameplayEvent>();
+        
+        try
+        {
+            string json = System.IO.File.ReadAllText(path);
+            EventsWrapper wrapper = JsonUtility.FromJson<EventsWrapper>(json);
+            
+            foreach (var se in wrapper.events)
+            {
+                importedEvents.Add(new GameplayEvent
+                {
+                    sessionID = se.sessionID,
+                    eventType = se.eventType,
+                    position = new Vector3(se.posX, se.posY, se.posZ),
+                    timestamp = se.timestamp,
+                    sessionDuration = se.sessionDuration
+                });
+            }
+            
+            Debug.Log($"[Analytics] Importados {importedEvents.Count} eventos desde: {path}");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[Analytics] Error al importar JSON: {e.Message}");
+        }
+        
+        return importedEvents;
+    }
+    
+    #endregion
 }
