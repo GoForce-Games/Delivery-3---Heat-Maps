@@ -31,8 +31,21 @@ public class AnalyticsEditorWindow : EditorWindow {
         gridSize = EditorGUILayout.Slider("Tamaño Cuadrícula", gridSize, 1.0f, 10.0f);
         heatmapColor = EditorGUILayout.ColorField("Color Base", heatmapColor);
 
-        if (GUILayout.Button("Cargar Datos desde Base de Datos")) {
-            // TODO call script PHP
+        if (GUILayout.Button("Cargar Datos desde Base de Datos"))
+        {
+            AnalyticsDBLoader.LoadFromDatabase(
+                eventTypes[selectedEventIndex],
+                sessionIds[selectedSessionIndex],
+                (events) =>
+                {
+                    HeatMapVisualizer visualizer = FindFirstObjectByType<HeatMapVisualizer>();
+                    if (visualizer != null)
+                    {
+                        visualizer.LoadEvents(events);
+                        SceneView.RepaintAll();
+                    }
+                }
+            );
         }
     }
 }
