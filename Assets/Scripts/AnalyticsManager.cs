@@ -170,7 +170,7 @@ public class AnalyticsManager : MonoBehaviour
         sessionStartTime = Time.time;
     }
     
-    public void RecordEvent(string type, Vector3 position, bool uploadToServer = false)
+    public void RecordEvent(string type, Vector3 position, bool uploadToServer = true)
     {
         GameplayEvent newEvent = new GameplayEvent
         {
