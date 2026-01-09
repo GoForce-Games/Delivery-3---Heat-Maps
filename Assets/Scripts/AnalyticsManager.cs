@@ -203,7 +203,7 @@ public class AnalyticsManager : MonoBehaviour
             ["sessionDuration"] = gameEvent.sessionDuration.ToString()
         };
 
-        StartCoroutine(Upload(data, "GameplayEvent.php"));
+        StartCoroutine(Upload(data, "PostGameplayEvents.php"));
     }
     
     public List<GameplayEvent> GetAllEvents()
