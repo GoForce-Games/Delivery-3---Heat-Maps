@@ -25,7 +25,16 @@ public enum EntityType
 public class AnalyticsManager : MonoBehaviour
 {
     // Singleton Instance
-    public static AnalyticsManager Instance { get; private set; }
+    private static AnalyticsManager _instance;
+    public static AnalyticsManager Instance
+    {
+        get
+        {
+            if (!_instance) _instance = FindFirstObjectByType<AnalyticsManager>();
+            return _instance;
+        }
+        private set => _instance = value;
+    }
 
     [Header("Position Tracking")]
     public bool isPositionTracking = true;
@@ -36,6 +45,11 @@ public class AnalyticsManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        if (Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         // Auto-find player if positionTracker not set
         if (positionTracker == null)
         {
