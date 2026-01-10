@@ -15,6 +15,11 @@ namespace Gamekit3D
             var pc = other.GetComponent<PlayerController>();
             if (pc != null)
             {
+                // Analytics: Record death by environment (no enemy, so enemyID = 0)
+                if (AnalyticsManager.Instance != null)
+                {
+                    AnalyticsManager.Instance.RecordEvent("Muerte", other.transform.position, 0);
+                }
                 pc.Die(new Damageable.DamageMessage());
             }
             if (audio != null)

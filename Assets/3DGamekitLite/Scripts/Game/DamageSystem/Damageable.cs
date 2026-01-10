@@ -96,12 +96,19 @@ namespace Gamekit3D
             isInvulnerable = true;
             currentHitPoints -= data.amount;
 
-            // Analytics: Record hit event when Ellen (Player) hits an enemy
-            if (data.damager != null && data.damager.name == "intable")
+            // Get enemy ID (use damager's instance ID or this object's instance ID)
+            int enemyID = 0;
+            if (data.damager != null)
             {
-                if (gameObject.CompareTag("Enemy") || gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter"))
+                enemyID = data.damager.GetInstanceID();
+            }
+
+            // Analytics: Record hit event when Ellen (Player) hits an enemy
+            if (data.damager != null)
+            {
+                if (gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter") || gameObject.name.Contains("Grenadier"))
                 {
-                    AnalyticsManager.Instance.RecordEvent("Golpe", transform.position);
+                    AnalyticsManager.Instance.RecordEvent("Golpe", transform.position, gameObject.GetInstanceID());
                 }
             }
 
@@ -112,15 +119,26 @@ namespace Gamekit3D
                 // Analytics: Record death events
                 if (gameObject.CompareTag("Player") || gameObject.name == "Ellen")
                 {
-                    AnalyticsManager.Instance.RecordEvent("Muerte", transform.position);
+                    // Player died - enemyID is who killed them
+                    AnalyticsManager.Instance.RecordEvent("Muerte", transform.position, enemyID);
                 }
-                else if (gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter"))
+                else if (gameObject.name.Contains("Chomper") || gameObject.name.Contains("Spitter") || gameObject.name.Contains("Grenadier"))
                 {
-                    AnalyticsManager.Instance.RecordEvent("MuerteEnemigo", transform.position);
+                    // Enemy died - use their own ID
+                    AnalyticsManager.Instance.RecordEvent("Enemigo", transform.position, gameObject.GetInstanceID());
                 }
             }
             else
+            {
                 OnReceiveDamage.Invoke();
+                
+                // Analytics: Record damage received by player (goes to damage_event)
+                if (gameObject.name.Contains("Ellen"))
+                {
+                    // Player took damage - enemyID is who hit them
+                    AnalyticsManager.Instance.RecordEvent("Daño", transform.position, enemyID);
+                }
+            }
 
             var messageType = currentHitPoints <= 0 ? MessageType.DEAD : MessageType.DAMAGED;
 

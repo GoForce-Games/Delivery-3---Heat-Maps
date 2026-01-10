@@ -6,7 +6,8 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class AnalyticsEditorWindow : EditorWindow {
-    string[] eventTypes = { "Ruta", "Muerte", "Enemigo", "Salto", "Golpe" };
+    // Must match types in PostGameplayEvents.php: Salto, Golpe, Muerte, Enemigo, Caminar, Correr, Daño
+    string[] eventTypes = { "Caminar", "Salto", "Golpe", "Daño", "Muerte", "Enemigo" };
     int selectedEventIndex = 0;
 
     string[] visTypes = { "Heatmap", "Líneas de Ruta", "Marcadores de Evento" };

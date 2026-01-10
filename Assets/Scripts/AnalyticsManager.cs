@@ -19,11 +19,15 @@ public enum EntityType
     public Vector3 position;
     public string timestamp;
     public float sessionDuration;
+    public int enemyID; // ID of the enemy involved in the event
     public bool isSentToServer;
 }
 
 public class AnalyticsManager : MonoBehaviour
 {
+    // Server URL
+    private const string SERVER_URL = "https://citmalumnes.upc.es/~edgarmd1/";
+    
     // Singleton Instance
     private static AnalyticsManager _instance;
     public static AnalyticsManager Instance
@@ -65,10 +69,80 @@ public class AnalyticsManager : MonoBehaviour
             }
         }
         
-        // Start position tracking coroutine
+        // Initialize session with server
+        StartCoroutine(InitializeSessionCoroutine());
+    }
+    
+    IEnumerator InitializeSessionCoroutine()
+    {
+        Debug.Log("[Analytics] Solicitando nuevo sessionID al servidor...");
+        
+        // Create form with device ID
+        WWWForm form = new WWWForm();
+        form.AddField("deviceID", SystemInfo.deviceUniqueIdentifier);
+        
+        using UnityWebRequest www = UnityWebRequest.Post(SERVER_URL + "StartSession.php", form);
+        yield return www.SendWebRequest();
+        
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError("[Analytics] Error al obtener sessionID: " + www.error);
+            // Fallback: usar un ID local basado en tiempo
+            currentSessionID = (int)(DateTime.UtcNow.Ticks % int.MaxValue);
+            Debug.LogWarning("[Analytics] Usando sessionID local de fallback: " + currentSessionID);
+        }
+        else
+        {
+            string response = www.downloadHandler.text.Trim();
+            if (int.TryParse(response, out int serverSessionID))
+            {
+                currentSessionID = serverSessionID;
+                Debug.Log("[Analytics] SessionID obtenido del servidor: " + currentSessionID);
+            }
+            else
+            {
+                Debug.LogError("[Analytics] Respuesta inválida del servidor: " + response);
+                currentSessionID = (int)(DateTime.UtcNow.Ticks % int.MaxValue);
+            }
+        }
+        
+        sessionStartTime = Time.time;
+        
+        // Start position tracking after session is initialized
         if (isPositionTracking && positionTracker != null)
         {
             StartCoroutine(PositionTrackingCoroutine());
+        }
+    }
+    
+    void OnApplicationQuit()
+    {
+        // End the session when the game closes (synchronous call because coroutines don't complete on quit)
+        if (currentSessionID > 0)
+        {
+            EndSessionSync();
+        }
+    }
+    
+    void EndSessionSync()
+    {
+        Debug.Log("[Analytics] Cerrando sesión...");
+        
+        try
+        {
+            // Use synchronous web request for OnApplicationQuit
+            using var client = new System.Net.WebClient();
+            var data = new System.Collections.Specialized.NameValueCollection();
+            data["sessionID"] = currentSessionID.ToString();
+            
+            byte[] response = client.UploadValues(SERVER_URL + "EndSession.php", "POST", data);
+            string result = System.Text.Encoding.UTF8.GetString(response);
+            
+            Debug.Log("[Analytics] Sesión cerrada: " + result);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[Analytics] Error al cerrar sesión: " + e.Message);
         }
     }
 
@@ -88,7 +162,7 @@ public class AnalyticsManager : MonoBehaviour
             
             if (positionTracker != null)
             {
-                RecordEvent("Posicion", positionTracker.position);
+                RecordEvent("Caminar", positionTracker.position);
             }
         }
     }
@@ -114,7 +188,7 @@ public class AnalyticsManager : MonoBehaviour
             form.AddField(kvp.Key, kvp.Value);
         }
 
-        using var www = UnityWebRequest.Post("https://citmalumnes.upc.es/~edgarmd1/" + endpoint, form);
+        using var www = UnityWebRequest.Post(SERVER_URL + endpoint, form);
         www.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
         yield return www.SendWebRequest();
 
@@ -154,7 +228,7 @@ public class AnalyticsManager : MonoBehaviour
     #region Event Recording
     
     private List<GameplayEvent> localEventsList = new List<GameplayEvent>();
-    private int currentSessionID = 0;
+    private int currentSessionID = 1;
     private float sessionStartTime;
     
     void Awake()
@@ -172,17 +246,25 @@ public class AnalyticsManager : MonoBehaviour
     
     public void RecordEvent(string type, Vector3 position, bool uploadToServer = true)
     {
+        RecordEvent(type, position, 0, uploadToServer);
+    }
+    
+    public void RecordEvent(string type, Vector3 position, int enemyID, bool uploadToServer = true)
+    {
         GameplayEvent newEvent = new GameplayEvent
         {
             sessionID = currentSessionID,
             eventType = type,
             position = position,
-            timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
-            sessionDuration = Time.time - sessionStartTime
+            // Use Spanish timezone (Europe/Madrid = UTC+1 in winter, UTC+2 in summer)
+            timestamp = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, 
+                TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time")).ToString("yyyy-MM-dd HH:mm:ss"),
+            sessionDuration = Time.time - sessionStartTime,
+            enemyID = enemyID
         };
 
         localEventsList.Add(newEvent);
-        Debug.Log($"[Analytics] Evento registrado: {type} en {position}. Total eventos: {localEventsList.Count}");
+        Debug.Log($"[Analytics] Evento registrado: {type} en {position} (enemyID: {enemyID}). Total eventos: {localEventsList.Count}");
 
         if (uploadToServer)
         {
@@ -192,15 +274,17 @@ public class AnalyticsManager : MonoBehaviour
     
     private void UploadEvent(GameplayEvent gameEvent)
     {
+        // Use InvariantCulture to ensure decimal point (.) instead of comma (,)
         Dictionary<string, string> data = new Dictionary<string, string>
         {
             ["sessionID"] = gameEvent.sessionID.ToString(),
             ["eventType"] = gameEvent.eventType,
-            ["positionX"] = gameEvent.position.x.ToString(),
-            ["positionY"] = gameEvent.position.y.ToString(),
-            ["positionZ"] = gameEvent.position.z.ToString(),
+            ["positionX"] = gameEvent.position.x.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+            ["positionY"] = gameEvent.position.y.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+            ["positionZ"] = gameEvent.position.z.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
             ["timestamp"] = gameEvent.timestamp,
-            ["sessionDuration"] = gameEvent.sessionDuration.ToString()
+            ["sessionDuration"] = gameEvent.sessionDuration.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+            ["enemyID"] = gameEvent.enemyID.ToString()
         };
 
         StartCoroutine(Upload(data, "PostGameplayEvents.php"));
