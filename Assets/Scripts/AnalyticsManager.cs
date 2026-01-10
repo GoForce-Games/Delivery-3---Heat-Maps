@@ -14,7 +14,7 @@ public enum EntityType
 
 [System.Serializable]
     public class GameplayEvent {
-    public string sessionID;
+    public int sessionID;
     public string eventType; 
     public Vector3 position;
     public string timestamp;
@@ -154,7 +154,7 @@ public class AnalyticsManager : MonoBehaviour
     #region Event Recording
     
     private List<GameplayEvent> localEventsList = new List<GameplayEvent>();
-    private string currentSessionID = System.Guid.NewGuid().ToString();
+    private int currentSessionID = 0;
     private float sessionStartTime;
     
     void Awake()
@@ -194,7 +194,7 @@ public class AnalyticsManager : MonoBehaviour
     {
         Dictionary<string, string> data = new Dictionary<string, string>
         {
-            ["sessionID"] = gameEvent.sessionID,
+            ["sessionID"] = gameEvent.sessionID.ToString(),
             ["eventType"] = gameEvent.eventType,
             ["positionX"] = gameEvent.position.x.ToString(),
             ["positionY"] = gameEvent.position.y.ToString(),
@@ -230,7 +230,7 @@ public class AnalyticsManager : MonoBehaviour
     [System.Serializable]
     private class SerializableEvent
     {
-        public string sessionID;
+        public int sessionID;
         public string eventType;
         public float posX, posY, posZ;
         public string timestamp;
