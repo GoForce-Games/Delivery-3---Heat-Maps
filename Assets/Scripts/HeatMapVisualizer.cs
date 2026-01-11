@@ -16,11 +16,15 @@ public class HeatMapVisualizer : MonoBehaviour
     
     [Header("Visualización")]
     public bool showHeatmap = true;
-    public bool showRoute = true;
     public bool useSpheresForHeatmap = false; 
     
     [Header("Colores")]
-    public Color routeColor = Color.cyan;
+    public Color colorPosition = Color.blue;
+    public Color colorJump = Color.yellow;
+    public Color colorDeath = Color.red;
+    public Color colorHit = Color.magenta;
+    public Color colorEnemyKill = Color.green;
+    
     public Color lowDensityColor = new Color(0, 0, 1, 0.3f);  
     public Color highDensityColor = new Color(1, 0, 0, 0.8f); 
     
@@ -32,8 +36,39 @@ public class HeatMapVisualizer : MonoBehaviour
     public bool showEnemyKills = true;
     
     
+    
+    private class CellData
+    {
+        public int totalCount;
+        public Dictionary<string, int> typeCounts = new Dictionary<string, int>();
+
+        public void AddEvent(string type)
+        {
+            totalCount++;
+            if (string.IsNullOrEmpty(type)) type = "unknown";
+            
+            if (!typeCounts.ContainsKey(type)) typeCounts[type] = 0;
+            typeCounts[type]++;
+        }
+
+        public string GetDominantType()
+        {
+            string dominant = "";
+            int max = -1;
+            foreach(var kvp in typeCounts)
+            {
+                if(kvp.Value > max)
+                {
+                    max = kvp.Value;
+                    dominant = kvp.Key;
+                }
+            }
+            return dominant;
+        }
+    }
+
     private List<GameplayEvent> loadedEvents = new List<GameplayEvent>();
-    private Dictionary<Vector2Int, int> heatmapGrid = new Dictionary<Vector2Int, int>();
+    private Dictionary<Vector2Int, CellData> heatmapGrid = new Dictionary<Vector2Int, CellData>();
     private int maxEventsInCell = 1;
     
     public void LoadDataFromManager()
@@ -56,6 +91,14 @@ public class HeatMapVisualizer : MonoBehaviour
         Debug.Log($"[HeatMapVisualizer] Cargados {loadedEvents.Count} eventos.");
         ProcessHeatmapGrid();
     }
+
+    public void AppendEvents(List<GameplayEvent> events)
+    {
+        if (loadedEvents == null) loadedEvents = new List<GameplayEvent>();
+        loadedEvents.AddRange(events);
+        Debug.Log($"[HeatMapVisualizer] Añadidos {events.Count} eventos. Total: {loadedEvents.Count}.");
+        ProcessHeatmapGrid();
+    }
     
     public void ClearData()
     {
@@ -76,19 +119,16 @@ public class HeatMapVisualizer : MonoBehaviour
         {
             Vector2Int cellKey = GetCellKey(gameEvent.position);
             
-            if (heatmapGrid.ContainsKey(cellKey))
+            if (!heatmapGrid.ContainsKey(cellKey))
             {
-                heatmapGrid[cellKey]++;
-            }
-            else
-            {
-                heatmapGrid[cellKey] = 1;
+                heatmapGrid[cellKey] = new CellData();
             }
             
+            heatmapGrid[cellKey].AddEvent(gameEvent.eventType);
             
-            if (heatmapGrid[cellKey] > maxEventsInCell)
+            if (heatmapGrid[cellKey].totalCount > maxEventsInCell)
             {
-                maxEventsInCell = heatmapGrid[cellKey];
+                maxEventsInCell = heatmapGrid[cellKey].totalCount;
             }
         }
         
@@ -147,40 +187,9 @@ public class HeatMapVisualizer : MonoBehaviour
         List<GameplayEvent> filteredEvents = GetFilteredEvents();
         
         
-        if (showRoute && filteredEvents.Count > 1)
-        {
-            DrawRoute(filteredEvents);
-        }
-        
-        
         if (showHeatmap)
         {
             DrawHeatmap();
-        }
-    }
-    
-    private void DrawRoute(List<GameplayEvent> events)
-    {
-        Gizmos.color = routeColor;
-        
-        
-        var orderedEvents = events.OrderBy(e => e.timestamp).ThenBy(e => e.sessionDuration).ToList();
-        
-        for (int i = 0; i < orderedEvents.Count - 1; i++)
-        {
-            Vector3 start = orderedEvents[i].position;
-            Vector3 end = orderedEvents[i + 1].position;
-            
-            Gizmos.DrawLine(start, end);
-            
-            
-            Gizmos.DrawWireSphere(start, 0.15f);
-        }
-        
-        
-        if (orderedEvents.Count > 0)
-        {
-            Gizmos.DrawWireSphere(orderedEvents[orderedEvents.Count - 1].position, 0.15f);
         }
     }
     
@@ -188,30 +197,50 @@ public class HeatMapVisualizer : MonoBehaviour
     {
         foreach (var cell in heatmapGrid)
         {
-            Color cellColor = GetHeatmapColor(cell.Value);
+            Vector2Int key = cell.Key;
+            CellData data = cell.Value;
+            
+            Color baseColor = GetColorByType(data.GetDominantType());
+            
+            float density = (float)data.totalCount / maxEventsInCell;
+            // Ensure alpha is at least visible
+            float alpha = Mathf.Clamp(density, 0.3f, 1f); 
+            Color cellColor = new Color(baseColor.r, baseColor.g, baseColor.b, alpha);
+
             Gizmos.color = cellColor;
             
-            
-            float avgY = CalculateAverageY(cell.Key);
-            Vector3 cellCenter = GetCellCenter(cell.Key, avgY);
+            float avgY = CalculateAverageY(key);
+            Vector3 cellCenter = GetCellCenter(key, avgY);
             
             if (useSpheresForHeatmap)
             {
-                
-                float scale = 1f + (float)cell.Value / maxEventsInCell;
+                float scale = 1f + (float)data.totalCount / maxEventsInCell;
                 Gizmos.DrawSphere(cellCenter, sphereRadius * scale);
             }
             else
             {
-                
-                float heightScale = 1f + (float)cell.Value / maxEventsInCell * 2f;
+                float heightScale = 1f + (float)data.totalCount / maxEventsInCell * 2f;
                 Vector3 cubeSize = new Vector3(gridSize * 0.9f, cubeHeight * heightScale, gridSize * 0.9f);
                 Gizmos.DrawCube(cellCenter, cubeSize);
                 
-                
-                Gizmos.color = new Color(cellColor.r, cellColor.g, cellColor.b, 1f);
+                Gizmos.color = new Color(baseColor.r, baseColor.g, baseColor.b, 1f);
                 Gizmos.DrawWireCube(cellCenter, cubeSize);
             }
+        }
+    }
+
+    private Color GetColorByType(string eventType)
+    {
+        if (string.IsNullOrEmpty(eventType)) return Color.white;
+        
+        switch (eventType.ToLower())
+        {
+            case "muerte": return colorDeath;
+            case "salto": return colorJump;
+            case "posicion": return colorPosition; // or walk
+            case "golpe": return colorHit;
+            case "enemigos matados": return colorEnemyKill;
+            default: return Color.white;
         }
     }
     
@@ -250,6 +279,7 @@ public class HeatmapEditorWindow : EditorWindow
     private HeatMapVisualizer visualizer;
     private Vector2 scrollPosition;
     private string jsonPath = "";
+    private bool appendData = false;
     
     [MenuItem("Window/Analytics/Heatmap Visualizer")]
     public static void ShowWindow()
@@ -344,6 +374,8 @@ public class HeatmapEditorWindow : EditorWindow
         
         EditorGUILayout.Space(5);
         
+        // Append Data Toggle
+        appendData = EditorGUILayout.ToggleLeft("Acumular Datos", appendData);
         
         EditorGUILayout.BeginHorizontal();
         jsonPath = EditorGUILayout.TextField("Ruta JSON:", jsonPath);
@@ -357,10 +389,17 @@ public class HeatmapEditorWindow : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
         
-        if (!string.IsNullOrEmpty(jsonPath) && GUILayout.Button("Cargar desde JSON"))
+        EditorGUILayout.BeginHorizontal();
+        if (!string.IsNullOrEmpty(jsonPath) && GUILayout.Button("Cargar JSON"))
         {
             LoadFromJson(jsonPath);
         }
+        
+        if (GUILayout.Button("Cargar Carpeta"))
+        {
+            LoadFromFolder();
+        }
+        EditorGUILayout.EndHorizontal();
         
         EditorGUILayout.Space(5);
         
@@ -460,7 +499,6 @@ public class HeatmapEditorWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
         
         visualizer.showHeatmap = EditorGUILayout.Toggle("Mostrar Heatmap", visualizer.showHeatmap);
-        visualizer.showRoute = EditorGUILayout.Toggle("Mostrar Ruta", visualizer.showRoute);
         visualizer.useSpheresForHeatmap = EditorGUILayout.Toggle("Usar Esferas", visualizer.useSpheresForHeatmap);
         
         EditorGUILayout.Space(5);
@@ -471,9 +509,13 @@ public class HeatmapEditorWindow : EditorWindow
         
         EditorGUILayout.Space(5);
         
-        visualizer.routeColor = EditorGUILayout.ColorField("Color Ruta", visualizer.routeColor);
-        visualizer.lowDensityColor = EditorGUILayout.ColorField("Color Baja Densidad", visualizer.lowDensityColor);
-        visualizer.highDensityColor = EditorGUILayout.ColorField("Color Alta Densidad", visualizer.highDensityColor);
+        EditorGUILayout.Space(5);
+        
+        visualizer.colorDeath = EditorGUILayout.ColorField("Color Muerte", visualizer.colorDeath);
+        visualizer.colorJump = EditorGUILayout.ColorField("Color Salto", visualizer.colorJump);
+        visualizer.colorPosition = EditorGUILayout.ColorField("Color Posición", visualizer.colorPosition);
+        visualizer.colorHit = EditorGUILayout.ColorField("Color Golpe", visualizer.colorHit);
+        visualizer.colorEnemyKill = EditorGUILayout.ColorField("Color Enemigo", visualizer.colorEnemyKill);
         
         if (EditorGUI.EndChangeCheck())
         {
@@ -519,13 +561,46 @@ public class HeatmapEditorWindow : EditorWindow
         if (AnalyticsManager.Instance != null)
         {
             List<GameplayEvent> events = AnalyticsManager.Instance.ImportFromJson(path);
-            visualizer.LoadEvents(events);
+            if (appendData)
+            {
+                visualizer.AppendEvents(events);
+                EditorUtility.DisplayDialog("Cargar JSON", $"Añadidos {events.Count} eventos.", "OK");
+            }
+            else
+            {
+                visualizer.LoadEvents(events);
+                EditorUtility.DisplayDialog("Cargar JSON", $"Cargados {events.Count} eventos.", "OK");
+            }
             SceneView.RepaintAll();
-            EditorUtility.DisplayDialog("Cargar JSON", $"Cargados {events.Count} eventos desde JSON.", "OK");
         }
         else
         {
             Debug.LogError("[HeatmapEditorWindow] AnalyticsManager no encontrado. Asegúrate de que existe en la escena.");
+        }
+    }
+
+    private void LoadFromFolder()
+    {
+        string path = EditorUtility.OpenFolderPanel("Seleccionar Carpeta con JSONs", Application.dataPath, "");
+        if (string.IsNullOrEmpty(path)) return;
+
+        if (AnalyticsManager.Instance != null)
+        {
+            string[] files = System.IO.Directory.GetFiles(path, "*.json");
+            int totalEvents = 0;
+            
+            // If not appending, clear first
+            if (!appendData) visualizer.ClearData();
+
+            foreach (string file in files)
+            {
+                List<GameplayEvent> events = AnalyticsManager.Instance.ImportFromJson(file);
+                visualizer.AppendEvents(events);
+                totalEvents += events.Count;
+            }
+            
+            SceneView.RepaintAll();
+            EditorUtility.DisplayDialog("Cargar Carpeta", $"Cargados {files.Length} archivos con un total de {totalEvents} eventos.", "OK");
         }
     }
     

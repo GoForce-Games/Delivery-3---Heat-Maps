@@ -404,6 +404,19 @@ public class AnalyticsManager : MonoBehaviour
                 int dataIndex = json.IndexOf("\"data\":");
                 if (dataIndex != -1)
                 {
+                    // Attempt to extract table name from header to determine event type
+                    // Format: "name":"walk_event" or similar inside the table definition object
+                    string eventType = "Position"; // Default
+                    
+                    if (json.Contains("\"walk_event\"")) eventType = "posicion";
+                    else if (json.Contains("\"jump_event\"")) eventType = "salto";
+                    else if (json.Contains("\"death_event\"")) eventType = "muerte";
+                    else if (json.Contains("\"hit_event\"")) eventType = "golpe";
+                    else if (json.Contains("\"damage_event\"")) eventType = "golpe";
+                    else if (json.Contains("\"kill_event\"")) eventType = "enemigos matados";
+                    
+                    Debug.Log($"[Analytics] Detectado tipo de evento por tabla: {eventType}");
+
                     int start = json.IndexOf("[", dataIndex);
                     
                     // The file ends with `]}]` or `] } ]`
@@ -429,7 +442,7 @@ public class AnalyticsManager : MonoBehaviour
                                 importedEvents.Add(new GameplayEvent
                                 {
                                     sessionID = int.Parse(item.session_id),
-                                    eventType = "Position", // Inferred from table name
+                                    eventType = eventType,
                                     position = new Vector3(x, y, z),
                                     timestamp = item.timestampo,
                                     sessionDuration = 0 // Not in this export
