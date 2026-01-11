@@ -256,9 +256,8 @@ public class AnalyticsManager : MonoBehaviour
             sessionID = currentSessionID,
             eventType = type,
             position = position,
-            // Use Spanish timezone (Europe/Madrid = UTC+1 in winter, UTC+2 in summer)
-            timestamp = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, 
-                TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time")).ToString("yyyy-MM-dd HH:mm:ss"),
+            // Use Spanish timezone via safe helper
+            timestamp = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, GetTargetTimeZone()).ToString("yyyy-MM-dd HH:mm:ss"),
             sessionDuration = Time.time - sessionStartTime,
             enemyID = enemyID
         };
@@ -269,6 +268,26 @@ public class AnalyticsManager : MonoBehaviour
         if (uploadToServer)
         {
             UploadEvent(newEvent);
+        }
+    }
+    private TimeZoneInfo GetTargetTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Fallback for Mac/Linux
+                return TimeZoneInfo.FindSystemTimeZoneById("Europe/Madrid");
+            }
+            catch
+            {
+                // Ultimate fallback
+                return TimeZoneInfo.Local;
+            }
         }
     }
     
@@ -316,9 +335,27 @@ public class AnalyticsManager : MonoBehaviour
     {
         public int sessionID;
         public string eventType;
-        public float posX, posY, posZ;
+        public float positionX, positionY, positionZ;
         public string timestamp;
         public float sessionDuration;
+    }
+    
+    // Helper classes for PHPMyAdmin raw export
+    [System.Serializable]
+    private class PhpMyAdminEvent
+    {
+        public string event_id;
+        public string session_id;
+        public string pos_x;
+        public string pos_y;
+        public string pos_z;
+        public string timestampo; // Matches the typo in the DB export
+    }
+
+    [System.Serializable]
+    private class PhpMyAdminWrapper
+    {
+        public List<PhpMyAdminEvent> items;
     }
     
     [System.Serializable]
@@ -337,9 +374,9 @@ public class AnalyticsManager : MonoBehaviour
             {
                 sessionID = e.sessionID,
                 eventType = e.eventType,
-                posX = e.position.x,
-                posY = e.position.y,
-                posZ = e.position.z,
+                positionX = e.position.x,
+                positionY = e.position.y,
+                positionZ = e.position.z,
                 timestamp = e.timestamp,
                 sessionDuration = e.sessionDuration
             });
@@ -357,18 +394,69 @@ public class AnalyticsManager : MonoBehaviour
         try
         {
             string json = System.IO.File.ReadAllText(path);
-            EventsWrapper wrapper = JsonUtility.FromJson<EventsWrapper>(json);
             
-            foreach (var se in wrapper.events)
+            // Check if it is a PHPMyAdmin export (starts with [ array)
+            if (json.TrimStart().StartsWith("["))
             {
-                importedEvents.Add(new GameplayEvent
+                Debug.Log("[Analytics] Detectado formato PHPMyAdmin.");
+                
+                // Extract the "data" array manually since JsonUtility can't handle the top-level array structure
+                int dataIndex = json.IndexOf("\"data\":");
+                if (dataIndex != -1)
                 {
-                    sessionID = se.sessionID,
-                    eventType = se.eventType,
-                    position = new Vector3(se.posX, se.posY, se.posZ),
-                    timestamp = se.timestamp,
-                    sessionDuration = se.sessionDuration
-                });
+                    int start = json.IndexOf("[", dataIndex);
+                    
+                    // The file ends with `]}]` or `] } ]`
+                    // So `json.LastIndexOf(']')` is the very last one.
+                    // `json.LastIndexOf(']', json.LastIndexOf(']') - 1)` should be the data array closer if it's the last element.
+                    
+                    int lastBracket = json.LastIndexOf(']');
+                    int secondLastBracket = json.LastIndexOf(']', lastBracket - 1);
+                    
+                    // Construct a wrapper that JsonUtility accepts
+                    string wrappedJson = "{\"items\":" + json.Substring(start, secondLastBracket - start + 1) + "}";
+                    
+                    PhpMyAdminWrapper phpWrapper = JsonUtility.FromJson<PhpMyAdminWrapper>(wrappedJson);
+                    
+                    if (phpWrapper != null && phpWrapper.items != null)
+                    {
+                        foreach (var item in phpWrapper.items)
+                        {
+                            if (float.TryParse(item.pos_x, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x) &&
+                                float.TryParse(item.pos_y, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y) &&
+                                float.TryParse(item.pos_z, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float z))
+                            {
+                                importedEvents.Add(new GameplayEvent
+                                {
+                                    sessionID = int.Parse(item.session_id),
+                                    eventType = "Position", // Inferred from table name
+                                    position = new Vector3(x, y, z),
+                                    timestamp = item.timestampo,
+                                    sessionDuration = 0 // Not in this export
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Standard Unity format
+                EventsWrapper wrapper = JsonUtility.FromJson<EventsWrapper>(json);
+                if (wrapper != null)
+                {
+                    foreach (var se in wrapper.events)
+                    {
+                        importedEvents.Add(new GameplayEvent
+                        {
+                            sessionID = se.sessionID,
+                            eventType = se.eventType,
+                            position = new Vector3(se.positionX, se.positionY, se.positionZ),
+                            timestamp = se.timestamp,
+                            sessionDuration = se.sessionDuration
+                        });
+                    }
+                }
             }
             
             Debug.Log($"[Analytics] Importados {importedEvents.Count} eventos desde: {path}");
